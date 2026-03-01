@@ -260,6 +260,7 @@ private struct AppRulesSettingsView: View {
 
     @State private var installedApps: [InstalledApp] = []
     @State private var searchQuery: String = ""
+
     private let appRefreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var activeRules: [BlockedAppRule] {
@@ -399,6 +400,18 @@ private struct AppRulesSettingsView: View {
 }
 
 private struct TimerSettingsView: View {
+    private struct TimerPreset: Identifiable, Hashable {
+        let kind: TimerPresetKind
+        let title: String
+        let subtitle: String
+        let work: Int?
+        let shortBreak: Int?
+        let longBreak: Int?
+        let rounds: Int?
+
+        var id: String { kind.rawValue }
+    }
+
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var coordinator: AppCoordinator
     @Query private var timerConfigs: [TimerConfig]
@@ -410,72 +423,361 @@ private struct TimerSettingsView: View {
     @State private var autoStopAfterRounds = 0
     @State private var lockedMode = false
     @State private var pin = ""
+    @State private var selectedPreset: TimerPresetKind = .pomodoro
+
+    private let presets: [TimerPreset] = [
+        TimerPreset(
+            kind: .pomodoro,
+            title: "Pomodoro",
+            subtitle: "25 / 5 / 15",
+            work: 25,
+            shortBreak: 5,
+            longBreak: 15,
+            rounds: 4
+        ),
+        TimerPreset(
+            kind: .deepWork,
+            title: "Deep Work",
+            subtitle: "50 / 10 / 20",
+            work: 50,
+            shortBreak: 10,
+            longBreak: 20,
+            rounds: 3
+        ),
+        TimerPreset(
+            kind: .sprint,
+            title: "Sprint",
+            subtitle: "15 / 3 / 10",
+            work: 15,
+            shortBreak: 3,
+            longBreak: 10,
+            rounds: 4
+        ),
+        TimerPreset(
+            kind: .custom,
+            title: "Custom",
+            subtitle: "Edit durations manually",
+            work: nil,
+            shortBreak: nil,
+            longBreak: nil,
+            rounds: nil
+        )
+    ]
 
     private var activeConfig: TimerConfig? {
         guard let profileID = coordinator.activeProfile?.id else { return nil }
         return timerConfigs.first { $0.profileID == profileID }
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Timer")
-                .font(.title2)
+    private var cycleEstimateMinutes: Int {
+        let shortBreakCount = max(0, roundsBeforeLongBreak - 1)
+        return (workMinutes * roundsBeforeLongBreak) + (shortBreakMinutes * shortBreakCount) + longBreakMinutes
+    }
 
-            Group {
-                Stepper("Work: \(workMinutes) min", value: $workMinutes, in: 5...180)
-                Stepper("Short break: \(shortBreakMinutes) min", value: $shortBreakMinutes, in: 1...30)
-                Stepper("Long break: \(longBreakMinutes) min", value: $longBreakMinutes, in: 5...60)
-                Stepper("Rounds before long break: \(roundsBeforeLongBreak)", value: $roundsBeforeLongBreak, in: 2...10)
-                Stepper(
-                    autoStopAfterRounds > 0
-                        ? "Auto-stop after rounds: \(autoStopAfterRounds)"
-                        : "Auto-stop after rounds: Off",
-                    value: $autoStopAfterRounds,
-                    in: 0...24
+    private var autoStopSummary: String {
+        autoStopAfterRounds > 0 ? "\(autoStopAfterRounds) rounds" : "Off"
+    }
+
+    private var isCustomPreset: Bool {
+        selectedPreset == .custom
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Timer")
+                    .font(.title2.weight(.semibold))
+
+                if activeConfig == nil {
+                    ContentUnavailableView(
+                        "No Active Profile",
+                        systemImage: "person.crop.circle.badge.exclamationmark",
+                        description: Text("Select an active profile to configure timer settings.")
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 220)
+                } else {
+                    timerOverviewCard
+                    timerPresetsCard
+                    timingCard
+                    cycleCard
+                    securityCard
+                    startupCard
+                    saveButton
+                }
+            }
+            .padding(16)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.95, green: 0.95, blue: 0.96),
+                            Color(red: 0.91, green: 0.92, blue: 0.93)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
-                Toggle("Locked mode", isOn: $lockedMode)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onAppear(perform: load)
+        .onChange(of: coordinator.activeProfile?.id) {
+            load()
+        }
+        .onChange(of: timerConfigs.count) {
+            load()
+        }
+    }
+
+    private var timerOverviewCard: some View {
+        card(title: "Current Plan", icon: "hourglass.bottomhalf.filled") {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(workMinutes)m")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Text("focus")
+                    .foregroundStyle(.secondary)
             }
 
-            HStack {
+            HStack(spacing: 10) {
+                summaryPill(text: "Short break \(shortBreakMinutes)m")
+                summaryPill(text: "Long break \(longBreakMinutes)m")
+                summaryPill(text: "\(roundsBeforeLongBreak) rounds/cycle")
+            }
+
+            Text("One full cycle is about \(cycleEstimateMinutes) minutes.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var timerPresetsCard: some View {
+        card(title: "Presets", icon: "wand.and.stars") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 10)], spacing: 10) {
+                ForEach(presets) { preset in
+                    let selected = selectedPreset == preset.kind
+                    Button {
+                        selectPreset(preset)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(preset.title)
+                                .font(.subheadline.weight(.semibold))
+                            Text(preset.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(selected ? Color.accentColor.opacity(0.18) : Color.white.opacity(0.6))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(
+                                    selected ? Color.accentColor.opacity(0.65) : Color.black.opacity(0.08),
+                                    lineWidth: selected ? 1.2 : 0.8
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var timingCard: some View {
+        card(title: "Durations", icon: "clock.badge") {
+            minuteStepperRow(title: "Work", value: $workMinutes, range: 5...180)
+            minuteStepperRow(title: "Short break", value: $shortBreakMinutes, range: 1...30)
+            minuteStepperRow(title: "Long break", value: $longBreakMinutes, range: 5...60)
+
+            if !isCustomPreset {
+                Text("Switch to Custom preset to edit durations.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .disabled(!isCustomPreset)
+        .opacity(isCustomPreset ? 1 : 0.52)
+    }
+
+    private var cycleCard: some View {
+        card(title: "Cycle Rules", icon: "arrow.triangle.2.circlepath") {
+            Stepper(value: $roundsBeforeLongBreak, in: 2...10) {
+                rowLabel(title: "Rounds before long break", value: "\(roundsBeforeLongBreak)")
+            }
+            .disabled(!isCustomPreset)
+            .opacity(isCustomPreset ? 1 : 0.52)
+
+            Stepper(value: $autoStopAfterRounds, in: 0...24) {
+                rowLabel(title: "Auto-stop after rounds", value: autoStopSummary)
+            }
+        }
+    }
+
+    private var securityCard: some View {
+        card(title: "Session Safety", icon: "lock.shield") {
+            Toggle("Locked mode", isOn: $lockedMode)
+
+            HStack(spacing: 8) {
                 SecureField("Set/Update PIN", text: $pin)
+                    .textFieldStyle(.roundedBorder)
+
                 Button("Save PIN") {
                     coordinator.savePIN(pin)
                     pin = ""
                 }
-                .disabled(pin.isEmpty)
+                .buttonStyle(.borderedProminent)
+                .disabled(pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-
-            HStack {
-                Toggle("Launch at login", isOn: Binding(get: {
-                    coordinator.appSettings()?.launchAtLoginEnabled ?? false
-                }, set: { value in
-                    coordinator.setLaunchAtLogin(enabled: value)
-                }))
-
-                Spacer()
-
-                Button("Save Timer Settings") {
-                    save()
-                }
-            }
-
-            Spacer()
         }
-        .onAppear(perform: load)
+    }
+
+    private var startupCard: some View {
+        card(title: "System", icon: "switch.2") {
+            Toggle("Launch at login", isOn: Binding(get: {
+                coordinator.appSettings()?.launchAtLoginEnabled ?? false
+            }, set: { value in
+                coordinator.setLaunchAtLogin(enabled: value)
+            }))
+        }
+    }
+
+    private var saveButton: some View {
+        Button {
+            save()
+        } label: {
+            Label("Save Timer Settings", systemImage: "checkmark.circle.fill")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+    }
+
+    private func card<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .foregroundStyle(Color.accentColor)
+                Text(title)
+                    .font(.headline)
+            }
+
+            content()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.78))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.92), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 8, y: 3)
+    }
+
+    private func minuteStepperRow(
+        title: String,
+        value: Binding<Int>,
+        range: ClosedRange<Int>
+    ) -> some View {
+        Stepper(value: value, in: range) {
+            rowLabel(title: title, value: "\(value.wrappedValue) min")
+        }
+    }
+
+    private func rowLabel(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func summaryPill(text: String) -> some View {
+        Text(text)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.72))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.95), lineWidth: 0.8)
+            )
+    }
+
+    private func selectPreset(_ preset: TimerPreset) {
+        selectedPreset = preset.kind
+        applyPresetValues(for: preset.kind, animated: true)
+    }
+
+    private func applyPresetValues(for preset: TimerPresetKind, animated: Bool) {
+        guard let presetValues = presetValues(for: preset) else { return }
+
+        let apply = {
+            workMinutes = presetValues.work
+            shortBreakMinutes = presetValues.shortBreak
+            longBreakMinutes = presetValues.longBreak
+            roundsBeforeLongBreak = presetValues.rounds
+        }
+
+        if animated {
+            withAnimation(.easeInOut(duration: 0.18), apply)
+        } else {
+            apply()
+        }
+    }
+
+    private func presetValues(for preset: TimerPresetKind) -> (work: Int, shortBreak: Int, longBreak: Int, rounds: Int)? {
+        switch preset {
+        case .pomodoro:
+            return (25, 5, 15, 4)
+        case .deepWork:
+            return (50, 10, 20, 3)
+        case .sprint:
+            return (15, 3, 10, 4)
+        case .custom:
+            return nil
+        }
     }
 
     private func load() {
         guard let config = activeConfig else { return }
+        selectedPreset = config.preset
+
         workMinutes = max(1, config.workSeconds / 60)
         shortBreakMinutes = max(1, config.shortBreakSeconds / 60)
         longBreakMinutes = max(1, config.longBreakSeconds / 60)
         roundsBeforeLongBreak = max(1, config.roundsBeforeLongBreak)
         autoStopAfterRounds = max(0, config.maxFocusRounds ?? 0)
         lockedMode = config.lockedModeEnabled
+
+        if selectedPreset != .custom {
+            applyPresetValues(for: selectedPreset, animated: false)
+        }
     }
 
     private func save() {
         guard let config = activeConfig else { return }
+
+        if selectedPreset != .custom {
+            applyPresetValues(for: selectedPreset, animated: false)
+        }
 
         config.workSeconds = workMinutes * 60
         config.shortBreakSeconds = shortBreakMinutes * 60
@@ -483,6 +785,7 @@ private struct TimerSettingsView: View {
         config.roundsBeforeLongBreak = roundsBeforeLongBreak
         config.maxFocusRounds = autoStopAfterRounds > 0 ? autoStopAfterRounds : nil
         config.lockedModeEnabled = lockedMode
+        config.preset = selectedPreset
         try? modelContext.save()
         coordinator.reloadIdleTimerDisplay()
     }
@@ -514,6 +817,9 @@ private struct SchedulesSettingsView: View {
     @State private var meridiem: Meridiem = .am
     @State private var selectedWeekdays: Set<Int> = [2, 3, 4, 5, 6]
     @State private var selectedScheduleID: UUID?
+
+    private let scheduleFormSpacing: CGFloat = 8
+    private let recurrencePickerWidth: CGFloat = 180
 
     private var activeSchedules: [ScheduleRule] {
         guard let profileID = coordinator.activeProfile?.id else { return [] }
@@ -564,13 +870,14 @@ private struct SchedulesSettingsView: View {
             }
             .frame(maxHeight: .infinity)
 
-            HStack {
+            HStack(spacing: scheduleFormSpacing) {
                 Picker("Recurrence", selection: $recurrence) {
                     ForEach(ScheduleRecurrence.allCases) { item in
-                        Text(item.rawValue).tag(item)
+                        Text(recurrenceLabel(for: item)).tag(item)
                     }
                 }
                 .pickerStyle(.menu)
+                .frame(width: recurrencePickerWidth, alignment: .leading)
 
                 HStack(spacing: 4) {
                     TextField("", text: $hourInput)
@@ -615,10 +922,7 @@ private struct SchedulesSettingsView: View {
                         .tint(selectedWeekdays.contains(day.number) ? .accentColor : .gray.opacity(0.45))
                     }
                 }
-
-                Text("Select one or more weekdays.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .padding(.leading, recurrencePickerWidth + scheduleFormSpacing)
             }
         }
         .onAppear {
@@ -709,6 +1013,19 @@ private struct SchedulesSettingsView: View {
         return String(format: "%d:%02d %@", hour12, minute, meridiem)
     }
 
+    private func recurrenceLabel(for recurrence: ScheduleRecurrence) -> String {
+        switch recurrence {
+        case .customWeekdays:
+            return "Custom"
+        case .daily:
+            return "Daily"
+        case .weekdays:
+            return "Weekdays"
+        case .weekends:
+            return "Weekends"
+        }
+    }
+
     private func recurrenceTitle(for schedule: ScheduleRule) -> String {
         if schedule.recurrence != .customWeekdays {
             return schedule.recurrence.rawValue.capitalized
@@ -741,33 +1058,459 @@ private struct SchedulesSettingsView: View {
 }
 
 private struct StatsSettingsView: View {
+    private struct ProfileSlice: Identifiable {
+        let profileID: UUID
+        let name: String
+        let seconds: Int
+        let color: Color
+
+        var id: UUID { profileID }
+    }
+
+    private struct HeatmapDay: Identifiable {
+        let date: Date
+        let seconds: Int
+        let isInCurrentYear: Bool
+        let level: Int
+
+        var id: Date { date }
+    }
+
+    private struct HeatmapModel {
+        let weeks: [[HeatmapDay]]
+    }
+
     @EnvironmentObject private var coordinator: AppCoordinator
+    @Query(sort: \Profile.name) private var profiles: [Profile]
+    @Query(sort: \SessionRecord.startedAt) private var sessionRecords: [SessionRecord]
+
+    private let profilePalette: [Color] = [
+        Color(red: 0.31, green: 0.46, blue: 0.78),
+        Color(red: 0.21, green: 0.61, blue: 0.56),
+        Color(red: 0.52, green: 0.45, blue: 0.76),
+        Color(red: 0.83, green: 0.59, blue: 0.38),
+        Color(red: 0.42, green: 0.68, blue: 0.42),
+        Color(red: 0.28, green: 0.59, blue: 0.76)
+    ]
+
+    private let heatmapCellSize: CGFloat = 11
+    private let heatmapCellSpacing: CGFloat = 3
+
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 2
+        return calendar
+    }
+
+    private var currentYear: Int {
+        calendar.component(.year, from: .now)
+    }
+
+    private var yearRange: (start: Date, end: Date) {
+        let start = calendar.date(from: DateComponents(year: currentYear, month: 1, day: 1)) ?? calendar.startOfDay(for: .now)
+        let end = calendar.date(byAdding: .year, value: 1, to: start) ?? .now
+        return (start, end)
+    }
+
+    private var yearRecords: [SessionRecord] {
+        let range = yearRange
+        return sessionRecords.filter { $0.startedAt >= range.start && $0.startedAt < range.end }
+    }
+
+    private var totalYearSeconds: Int {
+        yearRecords.reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    private var totalYearPomodoros: Int {
+        yearRecords.reduce(0) { $0 + $1.completedPomodoros }
+    }
+
+    private var activeYearDays: Int {
+        Set(yearRecords.map { calendar.startOfDay(for: $0.startedAt) }).count
+    }
+
+    private var monthSeconds: Int {
+        coordinator.sessionTotalsForCurrentMonth()
+    }
+
+    private var averageDailyMinutes: Int {
+        guard activeYearDays > 0 else { return 0 }
+        return (totalYearSeconds / 60) / activeYearDays
+    }
+
+    private var profileNameByID: [UUID: String] {
+        Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.name) })
+    }
+
+    private var profileSlices: [ProfileSlice] {
+        let totals = Dictionary(grouping: yearRecords, by: \.profileID)
+            .mapValues { rows in rows.reduce(0) { $0 + $1.durationSeconds } }
+            .filter { $0.value > 0 }
+            .sorted { $0.value > $1.value }
+
+        return totals.enumerated().map { index, entry in
+            ProfileSlice(
+                profileID: entry.key,
+                name: profileNameByID[entry.key] ?? "Unknown Profile",
+                seconds: entry.value,
+                color: profilePalette[index % profilePalette.count]
+            )
+        }
+    }
+
+    private var heatmapModel: HeatmapModel {
+        let range = yearRange
+        let totalsByDay = Dictionary(grouping: yearRecords, by: { calendar.startOfDay(for: $0.startedAt) })
+            .mapValues { rows in rows.reduce(0) { $0 + $1.durationSeconds } }
+
+        let start = startOfWeek(for: range.start)
+        let lastYearDay = calendar.date(byAdding: .day, value: -1, to: range.end) ?? range.start
+        let end = calendar.date(byAdding: .day, value: 6, to: startOfWeek(for: lastYearDay)) ?? lastYearDay
+
+        var rawDays: [(date: Date, seconds: Int, isInYear: Bool)] = []
+        var cursor = start
+        while cursor <= end {
+            let inYear = cursor >= range.start && cursor < range.end
+            rawDays.append((cursor, totalsByDay[cursor] ?? 0, inYear))
+            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? end.addingTimeInterval(1)
+        }
+
+        let cells = rawDays.map { item in
+            HeatmapDay(
+                date: item.date,
+                seconds: item.seconds,
+                isInCurrentYear: item.isInYear,
+                level: intensityLevel(seconds: item.seconds, isInCurrentYear: item.isInYear)
+            )
+        }
+
+        var weeks: [[HeatmapDay]] = []
+        var index = 0
+        while index < cells.count {
+            weeks.append(Array(cells[index ..< min(index + 7, cells.count)]))
+            index += 7
+        }
+
+        return HeatmapModel(weeks: weeks)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Stats")
-                .font(.title2)
+        let model = heatmapModel
 
-            statRow(title: "This Month", value: format(seconds: coordinator.sessionTotalsForCurrentMonth()))
-            statRow(title: "Current Streak", value: "\(coordinator.streakCount()) days")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Stats")
+                    .font(.title2.weight(.semibold))
 
-            Spacer()
+                statsOverviewCard
+                profileSplitCard
+                contributionCard(model: model)
+            }
+            .padding(16)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.95, green: 0.95, blue: 0.96),
+                            Color(red: 0.91, green: 0.92, blue: 0.93)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var statsOverviewCard: some View {
+        dashboardCard(
+            title: "Focus Overview",
+            subtitle: "\(currentYear) at a glance"
+        ) {
+            HStack(alignment: .top, spacing: 10) {
+                metricTile(label: "This Month", value: formatDuration(monthSeconds))
+                metricTile(label: "This Year", value: formatDuration(totalYearSeconds))
+                metricTile(label: "Streak", value: "\(coordinator.streakCount())d")
+                metricTile(label: "Active Days", value: "\(activeYearDays)")
+                metricTile(label: "Avg / Day", value: "\(averageDailyMinutes)m")
+            }
         }
     }
 
-    private func statRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
+    private var profileSplitCard: some View {
+        dashboardCard(
+            title: "Profile Distribution",
+            subtitle: "How your focus time is split across profiles"
+        ) {
+            if profileSlices.isEmpty {
+                Text("No focus sessions recorded yet for \(currentYear).")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 140, alignment: .center)
+            } else {
+                HStack(spacing: 18) {
+                    ZStack {
+                        ForEach(profileSlices.indices, id: \.self) { index in
+                            let range = donutAngles(for: index)
+                            DonutSegmentShape(startAngle: range.start, endAngle: range.end, thickness: 36)
+                                .fill(profileSlices[index].color.gradient)
+                                .shadow(color: profileSlices[index].color.opacity(0.22), radius: 5, y: 2)
+                        }
+
+                        VStack(spacing: 4) {
+                            Text(formatHours(totalYearSeconds))
+                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                            Text("\(totalYearPomodoros) rounds")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: 210, height: 210)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(profileSlices) { slice in
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(slice.color)
+                                    .frame(width: 9, height: 9)
+                                Text(slice.name)
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                                Text(percentageText(for: slice.seconds))
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                                Text(formatHours(slice.seconds))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 54, alignment: .trailing)
+                                    .monospacedDigit()
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func contributionCard(model: HeatmapModel) -> some View {
+        let gridHeight = (CGFloat(7) * heatmapCellSize) + (CGFloat(6) * heatmapCellSpacing)
+
+        return dashboardCard(
+            title: "Yearly Overview",
+            subtitle: "Daily focus intensity map"
+        ) {
+            GeometryReader { geometry in
+                let columnCount = max(1, model.weeks.count)
+                let totalSpacing = CGFloat(columnCount - 1) * heatmapCellSpacing
+                let availableWidth = max(1, geometry.size.width - totalSpacing)
+                let dynamicCellSize = max(4, min(heatmapCellSize, floor(availableWidth / CGFloat(columnCount))))
+                let cornerRadius = max(1.8, dynamicCellSize * 0.2)
+
+                HStack(alignment: .top, spacing: heatmapCellSpacing) {
+                    ForEach(model.weeks.indices, id: \.self) { weekIndex in
+                        VStack(spacing: heatmapCellSpacing) {
+                            ForEach(model.weeks[weekIndex]) { day in
+                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                    .fill(contributionColor(for: day))
+                                    .frame(width: dynamicCellSize, height: dynamicCellSize)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                            .strokeBorder(
+                                                Color.black.opacity(day.isInCurrentYear ? 0.06 : 0),
+                                                lineWidth: 0.4
+                                            )
+                                    )
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            }
+            .frame(height: gridHeight)
+
+            HStack(spacing: 6) {
+                Text("Less")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                ForEach(0...4, id: \.self) { level in
+                    RoundedRectangle(cornerRadius: 2.2, style: .continuous)
+                        .fill(contributionLegendColor(level: level))
+                        .frame(width: heatmapCellSize, height: heatmapCellSize)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 2.2, style: .continuous)
+                                .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.4)
+                        )
+                }
+                Text("More")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    private func dashboardCard<Content: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.72))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.9), Color.white.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: Color.black.opacity(0.06), radius: 10, y: 4)
+    }
+
+    private func metricTile(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
-            Spacer()
             Text(value)
-                .fontWeight(.medium)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(red: 0.95, green: 0.97, blue: 0.99))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.86), lineWidth: 0.8)
+        )
+    }
+
+    private func donutAngles(for index: Int) -> (start: Angle, end: Angle) {
+        let total = max(1, profileSlices.reduce(0) { $0 + $1.seconds })
+        let previousSeconds = profileSlices.prefix(index).reduce(0) { $0 + $1.seconds }
+        let currentSeconds = profileSlices[index].seconds
+
+        let start = Angle.degrees((Double(previousSeconds) / Double(total)) * 360 - 90)
+        let end = Angle.degrees((Double(previousSeconds + currentSeconds) / Double(total)) * 360 - 90)
+        return (start, end)
+    }
+
+    private func startOfWeek(for date: Date) -> Date {
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return calendar.date(from: components) ?? calendar.startOfDay(for: date)
+    }
+
+    private func intensityLevel(seconds: Int, isInCurrentYear: Bool) -> Int {
+        guard isInCurrentYear else { return -1 }
+        guard seconds > 0 else { return 0 }
+
+        let oneHour = 60 * 60
+        let twoAndHalfHours = Int(Double(oneHour) * 2.5)
+        let fiveHours = 5 * oneHour
+
+        switch seconds {
+        case ..<oneHour:
+            return 1
+        case ..<twoAndHalfHours:
+            return 2
+        case ..<fiveHours:
+            return 3
+        default:
+            return 4
         }
     }
 
-    private func format(seconds: Int) -> String {
+    private func contributionColor(for day: HeatmapDay) -> Color {
+        guard day.isInCurrentYear else { return Color.clear }
+        return contributionLegendColor(level: day.level)
+    }
+
+    private func contributionLegendColor(level: Int) -> Color {
+        switch level {
+        case 0:
+            return Color(red: 0.92, green: 0.93, blue: 0.94)
+        case 1:
+            return Color(red: 0.81, green: 0.87, blue: 0.98)
+        case 2:
+            return Color(red: 0.65, green: 0.76, blue: 0.95)
+        case 3:
+            return Color(red: 0.49, green: 0.64, blue: 0.90)
+        default:
+            return Color(red: 0.31, green: 0.46, blue: 0.78)
+        }
+    }
+
+    private func percentageText(for seconds: Int) -> String {
+        guard totalYearSeconds > 0 else { return "0%" }
+        let percentage = (Double(seconds) / Double(totalYearSeconds)) * 100
+        return String(format: "%.0f%%", percentage)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
         let hours = seconds / 3600
         let minutes = (seconds % 3600) / 60
         return "\(hours)h \(minutes)m"
+    }
+
+    private func formatHours(_ seconds: Int) -> String {
+        let hours = Double(seconds) / 3600.0
+        return String(format: "%.1fh", hours)
+    }
+}
+
+private struct DonutSegmentShape: Shape {
+    let startAngle: Angle
+    let endAngle: Angle
+    let thickness: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let outerRadius = min(rect.width, rect.height) / 2
+        let innerRadius = max(0, outerRadius - thickness)
+
+        var path = Path()
+        path.addArc(
+            center: center,
+            radius: outerRadius,
+            startAngle: startAngle,
+            endAngle: endAngle,
+            clockwise: false
+        )
+        path.addArc(
+            center: center,
+            radius: innerRadius,
+            startAngle: endAngle,
+            endAngle: startAngle,
+            clockwise: true
+        )
+        path.closeSubpath()
+        return path
     }
 }

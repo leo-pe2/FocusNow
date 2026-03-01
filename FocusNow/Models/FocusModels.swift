@@ -34,6 +34,15 @@ enum SessionEndedReason: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum TimerPresetKind: String, Codable, CaseIterable, Identifiable {
+    case pomodoro
+    case deepWork
+    case sprint
+    case custom
+
+    var id: String { rawValue }
+}
+
 @Model
 final class Profile {
     @Attribute(.unique) var id: UUID
@@ -67,6 +76,38 @@ final class TimerConfig {
     var roundsBeforeLongBreak: Int
     var maxFocusRounds: Int?
     var lockedModeEnabled: Bool
+    var presetRawValue: String?
+
+    var preset: TimerPresetKind {
+        get {
+            if let presetRawValue,
+               let preset = TimerPresetKind(rawValue: presetRawValue) {
+                return preset
+            }
+
+            let work = workSeconds / 60
+            let shortBreak = shortBreakSeconds / 60
+            let longBreak = longBreakSeconds / 60
+            let rounds = roundsBeforeLongBreak
+
+            if work == 25 && shortBreak == 5 && longBreak == 15 && rounds == 4 {
+                return .pomodoro
+            }
+
+            if work == 50 && shortBreak == 10 && longBreak == 20 && rounds == 3 {
+                return .deepWork
+            }
+
+            if work == 15 && shortBreak == 3 && longBreak == 10 && rounds == 4 {
+                return .sprint
+            }
+
+            return .custom
+        }
+        set {
+            presetRawValue = newValue.rawValue
+        }
+    }
 
     init(
         id: UUID = UUID(),
@@ -76,7 +117,8 @@ final class TimerConfig {
         longBreakSeconds: Int = 900,
         roundsBeforeLongBreak: Int = 4,
         maxFocusRounds: Int? = nil,
-        lockedModeEnabled: Bool = false
+        lockedModeEnabled: Bool = false,
+        preset: TimerPresetKind = .pomodoro
     ) {
         self.id = id
         self.profileID = profileID
@@ -86,6 +128,7 @@ final class TimerConfig {
         self.roundsBeforeLongBreak = roundsBeforeLongBreak
         self.maxFocusRounds = maxFocusRounds
         self.lockedModeEnabled = lockedModeEnabled
+        self.presetRawValue = preset.rawValue
     }
 }
 
