@@ -60,13 +60,17 @@ final class AppCoordinator: ObservableObject {
             return "Short Break"
         case .runningLongBreak:
             return "Long Break"
+        case .pausedWork:
+            return "Paused Focus"
+        case .pausedShortBreak, .pausedLongBreak:
+            return "Paused Break"
         case .completed:
             return "Completed"
         }
     }
 
     var timerString: String {
-        let total = sessionSnapshot.isRunning
+        let total = sessionSnapshot.isActive
             ? max(0, sessionSnapshot.remainingSeconds)
             : max(0, idleConfiguredWorkSeconds)
         let minutes = total / 60
@@ -86,6 +90,10 @@ final class AppCoordinator: ObservableObject {
                 return "flame.fill"
             case .runningShortBreak, .runningLongBreak:
                 return "cup.and.saucer.fill"
+            case .pausedWork:
+                return "pause.circle.fill"
+            case .pausedShortBreak, .pausedLongBreak:
+                return "pause.circle"
             case .idle, .completed:
                 return "circle.grid.2x2"
             }
@@ -135,15 +143,31 @@ final class AppCoordinator: ObservableObject {
     }
 
     func toggleSession() {
-        if sessionSnapshot.isRunning {
+        if sessionSnapshot.isActive {
             stopSessionIfAllowed()
         } else {
             startSession(profileName: nil, manualWorkSeconds: nil)
         }
     }
 
+    func pauseSession() {
+        guard sessionSnapshot.isRunning else { return }
+
+        Task {
+            await sessionEngine.pause()
+        }
+    }
+
+    func resumeSession() {
+        guard sessionSnapshot.isPaused else { return }
+
+        Task {
+            await sessionEngine.resume()
+        }
+    }
+
     func stopSessionIfAllowed() {
-        if sessionSnapshot.phase == .runningWork,
+        if sessionSnapshot.phase.isWork,
            sessionSnapshot.isLockedModeEnabled,
            hasPINConfigured {
             requiresLockedPinPrompt = true
@@ -373,7 +397,7 @@ final class AppCoordinator: ObservableObject {
 
             if new.phase == .runningWork {
                 applyBlocking(for: profile)
-            } else if new.phase.isBreak || new.phase == .idle || new.phase == .completed {
+            } else if new.phase.isPaused || new.phase.isBreak || new.phase == .idle || new.phase == .completed {
                 blockingCoordinator.disableAll()
                 blockerStatus = blockingCoordinator.combinedStatus()
             }
@@ -458,7 +482,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     private var effectiveMaxFocusRounds: Int {
-        if sessionSnapshot.isRunning {
+        if sessionSnapshot.isActive {
             return max(0, sessionSnapshot.maxFocusRounds)
         }
 

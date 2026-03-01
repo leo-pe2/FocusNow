@@ -25,7 +25,7 @@ struct FocusNowApp: App {
                     appDelegate.coordinator = coordinator
                 }
         } label: {
-            if coordinator.sessionSnapshot.isRunning {
+            if coordinator.sessionSnapshot.isActive {
                 Text(coordinator.timerString)
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
             } else {
@@ -35,13 +35,15 @@ struct FocusNowApp: App {
         .menuBarExtraStyle(.window)
         .modelContainer(modelContainer)
 
-        Settings {
+        Window("Settings", id: "settings") {
             SettingsRootView()
                 .environmentObject(coordinator)
                 .onAppear {
                     appDelegate.coordinator = coordinator
                 }
         }
+        .defaultSize(width: 760, height: 520)
+        .windowResizability(.contentMinSize)
         .modelContainer(modelContainer)
     }
 }

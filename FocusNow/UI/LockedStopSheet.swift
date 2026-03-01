@@ -23,6 +23,7 @@ struct LockedStopSheet: View {
                 Button("Cancel") {
                     coordinator.cancelLockedStopPrompt()
                 }
+                .pointingHandCursor()
 
                 Spacer()
 
@@ -31,6 +32,7 @@ struct LockedStopSheet: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(pin.isEmpty)
+                .pointingHandCursor()
             }
         }
         .padding()

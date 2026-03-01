@@ -5,10 +5,27 @@ enum SessionPhase: String, Codable, CaseIterable, Sendable {
     case runningWork
     case runningShortBreak
     case runningLongBreak
+    case pausedWork
+    case pausedShortBreak
+    case pausedLongBreak
     case completed
 
-    nonisolated var isWork: Bool { self == .runningWork }
-    nonisolated var isBreak: Bool { self == .runningShortBreak || self == .runningLongBreak }
+    nonisolated var isWork: Bool {
+        self == .runningWork || self == .pausedWork
+    }
+
+    nonisolated var isBreak: Bool {
+        self == .runningShortBreak
+            || self == .runningLongBreak
+            || self == .pausedShortBreak
+            || self == .pausedLongBreak
+    }
+
+    nonisolated var isPaused: Bool {
+        self == .pausedWork
+            || self == .pausedShortBreak
+            || self == .pausedLongBreak
+    }
 }
 
 struct SessionSnapshot: Sendable {
@@ -32,17 +49,24 @@ struct SessionSnapshot: Sendable {
         startedAt: nil
     )
 
-    nonisolated var isRunning: Bool { phase == .runningWork || phase.isBreak }
+    nonisolated var isRunning: Bool {
+        phase == .runningWork || phase == .runningShortBreak || phase == .runningLongBreak
+    }
+
+    nonisolated var isPaused: Bool {
+        phase.isPaused
+    }
+
+    nonisolated var isActive: Bool {
+        isRunning || isPaused
+    }
 }
 
 struct SessionSummary: Sendable {
     var startedAt: Date
     var endedAt: Date
+    var durationSeconds: Int
     var completedPomodoros: Int
     var endedReason: SessionEndedReason
     var lockedOverrideUsed: Bool
-
-    var durationSeconds: Int {
-        max(0, Int(endedAt.timeIntervalSince(startedAt)))
-    }
 }

@@ -3,13 +3,15 @@ import SwiftUI
 
 struct MainPopoverView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     @State private var lockedStopPIN: String = ""
     @State private var isHoveringSettingsButton = false
     @State private var isHoveringQuitButton = false
     @State private var isHoveringProfileButton = false
-    @State private var isHoveringStartStopButton = false
+    @State private var isHoveringStartButton = false
+    @State private var isHoveringPauseButton = false
+    @State private var isHoveringStopButton = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -33,6 +35,7 @@ struct MainPopoverView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .pointingHandCursor()
             }
 
             lockedStopSection
@@ -62,53 +65,65 @@ struct MainPopoverView: View {
 
     private var primaryControlsRow: some View {
         HStack(spacing: 8) {
-            Menu {
-                ForEach(coordinator.availableProfiles) { profile in
-                    Button(profile.name) {
-                        coordinator.makeProfileActive(profile)
+            if coordinator.sessionSnapshot.isActive {
+                controlButton(
+                    title: coordinator.sessionSnapshot.isPaused ? "Resume" : "Pause",
+                    hover: $isHoveringPauseButton,
+                    tint: .accentColor
+                ) {
+                    if coordinator.sessionSnapshot.isPaused {
+                        coordinator.resumeSession()
+                    } else {
+                        coordinator.pauseSession()
                     }
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Text(coordinator.activeProfile?.name ?? "Select Profile")
-                        .lineLimit(1)
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isHoveringProfileButton ? Color.accentColor.opacity(0.16) : Color.clear)
-                )
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
-            .foregroundStyle(isHoveringProfileButton ? Color.accentColor : Color.primary)
-            .onHover { hovering in
-                isHoveringProfileButton = hovering
-            }
 
-            Button {
-                coordinator.toggleSession()
-            } label: {
-                Text(coordinator.sessionSnapshot.isRunning ? "Stop" : "Start")
+                controlButton(
+                    title: "Stop",
+                    hover: $isHoveringStopButton,
+                    tint: .red
+                ) {
+                    coordinator.stopSessionIfAllowed()
+                }
+            } else {
+                Menu {
+                    ForEach(coordinator.availableProfiles) { profile in
+                        Button(profile.name) {
+                            coordinator.makeProfileActive(profile)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(coordinator.activeProfile?.name ?? "Select Profile")
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                    }
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isHoveringStartStopButton ? Color.accentColor.opacity(0.16) : Color.clear)
+                            .fill(isHoveringProfileButton ? Color.accentColor.opacity(0.16) : Color.clear)
                     )
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.defaultAction)
-            .frame(maxWidth: .infinity)
-            .foregroundStyle(isHoveringStartStopButton ? Color.accentColor : Color.primary)
-            .onHover { hovering in
-                isHoveringStartStopButton = hovering
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .foregroundStyle(isHoveringProfileButton ? Color.accentColor : Color.primary)
+                .onHover { hovering in
+                    isHoveringProfileButton = hovering
+                }
+                .pointingHandCursor()
+
+                controlButton(
+                    title: "Start",
+                    hover: $isHoveringStartButton,
+                    tint: .accentColor,
+                    shortcut: .defaultAction
+                ) {
+                    coordinator.startSession(profileName: nil, manualWorkSeconds: nil)
+                }
             }
         }
     }
@@ -157,6 +172,7 @@ struct MainPopoverView: View {
             .onHover { hovering in
                 isHoveringSettingsButton = hovering
             }
+            .pointingHandCursor()
 
             Button {
                 NSApp.terminate(nil)
@@ -174,6 +190,7 @@ struct MainPopoverView: View {
             .onHover { hovering in
                 isHoveringQuitButton = hovering
             }
+            .pointingHandCursor()
         }
     }
 
@@ -196,11 +213,13 @@ struct MainPopoverView: View {
                             submitLockedStopPIN()
                         }
                         .disabled(lockedStopPIN.isEmpty)
+                        .pointingHandCursor()
 
                         Button("Cancel") {
                             lockedStopPIN = ""
                             coordinator.cancelLockedStopPrompt()
                         }
+                        .pointingHandCursor()
                     }
                 }
             }
@@ -209,6 +228,33 @@ struct MainPopoverView: View {
 
     private func coordinatorSkipBreak() async {
         await coordinator.skipBreak()
+    }
+
+    private func controlButton(
+        title: String,
+        hover: Binding<Bool>,
+        tint: Color,
+        shortcut: KeyboardShortcut? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(hover.wrappedValue ? tint.opacity(0.16) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .foregroundStyle(hover.wrappedValue ? tint : Color.primary)
+        .onHover { hovering in
+            hover.wrappedValue = hovering
+        }
+        .pointingHandCursor()
+        .modifier(OptionalKeyboardShortcut(shortcut: shortcut))
     }
 
     private func submitLockedStopPIN() {
@@ -234,17 +280,54 @@ struct MainPopoverView: View {
     }
 
     private func openSettingsWindow() {
-        openSettings()
+        openWindow(id: "settings")
         NSApp.activate(ignoringOtherApps: true)
+        locateAndConfigureSettingsWindow()
+    }
 
-        DispatchQueue.main.async {
-            if let settingsWindow = NSApp.windows.first(where: { window in
-                (window.identifier?.rawValue == "com.apple.SwiftUI.Settings")
-                    || window.title.localizedCaseInsensitiveContains("settings")
-            }) {
-                settingsWindow.makeKeyAndOrderFront(nil)
-                settingsWindow.orderFrontRegardless()
-            }
+    private func locateAndConfigureSettingsWindow(retryCount: Int = 8) {
+        if let settingsWindow = NSApp.windows.first(where: { window in
+            (window.identifier?.rawValue == "settings")
+                || (window.identifier?.rawValue == "com.apple.SwiftUI.settings")
+                || (window.identifier?.rawValue == "com.apple.SwiftUI.Settings")
+                || window.title.localizedCaseInsensitiveContains("settings")
+        }) {
+            configureSettingsWindow(settingsWindow)
+            return
+        }
+
+        guard retryCount > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            locateAndConfigureSettingsWindow(retryCount: retryCount - 1)
+        }
+    }
+
+    private func configureSettingsWindow(_ window: NSWindow) {
+        let minSize = NSSize(width: 760, height: 520)
+        window.styleMask.insert(.resizable)
+        window.minSize = minSize
+        window.contentMinSize = minSize
+
+        if window.frame.size.width < minSize.width || window.frame.size.height < minSize.height {
+            var frame = window.frame
+            frame.size.width = max(frame.size.width, minSize.width)
+            frame.size.height = max(frame.size.height, minSize.height)
+            window.setFrame(frame, display: true, animate: false)
+        }
+
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
+}
+
+private struct OptionalKeyboardShortcut: ViewModifier {
+    let shortcut: KeyboardShortcut?
+
+    func body(content: Content) -> some View {
+        if let shortcut {
+            content.keyboardShortcut(shortcut)
+        } else {
+            content
         }
     }
 }

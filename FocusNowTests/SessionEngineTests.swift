@@ -32,4 +32,22 @@ final class SessionEngineTests: XCTestCase {
 
         XCTAssertNil(summary)
     }
+
+    @MainActor
+    func testPauseAndResumePreserveSessionState() async throws {
+        let engine = SessionEngine()
+
+        await engine.start(config: .default)
+        let runningSnapshot = await engine.currentSnapshot()
+
+        await engine.pause()
+        let pausedSnapshot = await engine.currentSnapshot()
+        XCTAssertEqual(pausedSnapshot.phase, .pausedWork)
+        XCTAssertEqual(pausedSnapshot.remainingSeconds, runningSnapshot.remainingSeconds)
+
+        await engine.resume()
+        let resumedSnapshot = await engine.currentSnapshot()
+        XCTAssertEqual(resumedSnapshot.phase, .runningWork)
+        XCTAssertEqual(resumedSnapshot.remainingSeconds, runningSnapshot.remainingSeconds)
+    }
 }

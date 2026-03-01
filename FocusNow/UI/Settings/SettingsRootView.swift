@@ -4,45 +4,148 @@ import SwiftData
 import SwiftUI
 
 struct SettingsRootView: View {
-    enum Tab: Hashable {
+    enum Tab: String, CaseIterable, Hashable {
         case profiles
         case websites
         case apps
         case timer
         case schedules
         case stats
+
+        var title: String {
+            switch self {
+            case .profiles: return "Profiles"
+            case .websites: return "Websites"
+            case .apps: return "Apps"
+            case .timer: return "Timer"
+            case .schedules: return "Schedules"
+            case .stats: return "Stats"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .profiles: return "person.2"
+            case .websites: return "globe"
+            case .apps: return "app"
+            case .timer: return "timer"
+            case .schedules: return "calendar"
+            case .stats: return "chart.bar"
+            }
+        }
     }
 
     @State private var selectedTab: Tab = .profiles
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            ProfilesSettingsView()
-                .tabItem { Label("Profiles", systemImage: "person.2") }
-                .tag(Tab.profiles)
+        VStack(spacing: 14) {
+            settingsNavBar
 
-            WebsiteRulesSettingsView()
-                .tabItem { Label("Websites", systemImage: "globe") }
-                .tag(Tab.websites)
-
-            AppRulesSettingsView()
-                .tabItem { Label("Apps", systemImage: "app") }
-                .tag(Tab.apps)
-
-            TimerSettingsView()
-                .tabItem { Label("Timer", systemImage: "timer") }
-                .tag(Tab.timer)
-
-            SchedulesSettingsView()
-                .tabItem { Label("Schedules", systemImage: "calendar") }
-                .tag(Tab.schedules)
-
-            StatsSettingsView()
-                .tabItem { Label("Stats", systemImage: "chart.bar") }
-                .tag(Tab.stats)
+            selectedTabView
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(width: 760, height: 520)
+        .frame(minWidth: 760, minHeight: 520)
         .padding()
+    }
+
+    private var settingsNavBar: some View {
+        HStack(spacing: 8) {
+            ForEach(Tab.allCases, id: \.self) { tab in
+                settingsTabButton(for: tab)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func settingsTabButton(for tab: Tab) -> some View {
+        let isSelected = selectedTab == tab
+
+        return Button {
+            withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) {
+                selectedTab = tab
+            }
+        } label: {
+            Label(tab.title, systemImage: tab.systemImage)
+                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isSelected ? Color.white.opacity(0.26) : Color.white.opacity(0.14))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(
+                            isSelected ? Color.white.opacity(0.95) : Color.white.opacity(0.45),
+                            lineWidth: isSelected ? 1.0 : 0.8
+                        )
+                )
+        }
+        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+        .pointingHandCursor()
+    }
+
+    @ViewBuilder
+    private var selectedTabView: some View {
+        switch selectedTab {
+        case .profiles:
+            ProfilesSettingsView()
+        case .websites:
+            WebsiteRulesSettingsView()
+        case .apps:
+            AppRulesSettingsView()
+        case .timer:
+            TimerSettingsView()
+        case .schedules:
+            SchedulesSettingsView()
+        case .stats:
+            StatsSettingsView()
+        }
+    }
+}
+
+private struct SettingsPagePalette {
+    let backgroundStart: Color
+    let backgroundEnd: Color
+    let cardFill: Color
+    let cardStroke: Color
+    let cardShadow: Color
+    let chipFill: Color
+    let chipStroke: Color
+    let secondarySurface: Color
+    let secondarySurfaceStroke: Color
+    let contributionEmpty: Color
+    let contributionStroke: Color
+
+    init(colorScheme: ColorScheme) {
+        if colorScheme == .dark {
+            backgroundStart = Color(red: 0.14, green: 0.15, blue: 0.18)
+            backgroundEnd = Color(red: 0.09, green: 0.10, blue: 0.12)
+            cardFill = Color(red: 0.17, green: 0.18, blue: 0.22).opacity(0.92)
+            cardStroke = Color.white.opacity(0.08)
+            cardShadow = Color.black.opacity(0.28)
+            chipFill = Color.white.opacity(0.08)
+            chipStroke = Color.white.opacity(0.06)
+            secondarySurface = Color.white.opacity(0.06)
+            secondarySurfaceStroke = Color.white.opacity(0.08)
+            contributionEmpty = Color(red: 0.22, green: 0.24, blue: 0.28)
+            contributionStroke = Color.white.opacity(0.05)
+        } else {
+            backgroundStart = Color(red: 0.95, green: 0.95, blue: 0.96)
+            backgroundEnd = Color(red: 0.91, green: 0.92, blue: 0.93)
+            cardFill = Color.white.opacity(0.78)
+            cardStroke = Color.white.opacity(0.92)
+            cardShadow = Color.black.opacity(0.04)
+            chipFill = Color.white.opacity(0.72)
+            chipStroke = Color.white.opacity(0.95)
+            secondarySurface = Color.white.opacity(0.6)
+            secondarySurfaceStroke = Color.black.opacity(0.08)
+            contributionEmpty = Color(red: 0.92, green: 0.93, blue: 0.94)
+            contributionStroke = Color.black.opacity(0.06)
+        }
     }
 }
 
@@ -100,6 +203,7 @@ private struct ProfilesSettingsView: View {
                             coordinator.makeProfileActive(row.model)
                         }
                         .buttonStyle(.borderless)
+                        .pointingHandCursor()
                     }
                 }
             }
@@ -111,6 +215,7 @@ private struct ProfilesSettingsView: View {
                     addProfile()
                 }
                 .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .pointingHandCursor()
             }
 
             HStack {
@@ -118,11 +223,13 @@ private struct ProfilesSettingsView: View {
                     useSelectedProfile()
                 }
                 .disabled(selectedProfile == nil)
+                .pointingHandCursor()
 
                 Button("Delete Selected") {
                     deleteSelectedProfile()
                 }
                 .disabled(selectedProfile == nil)
+                .pointingHandCursor()
             }
         }
         .onAppear {
@@ -207,6 +314,10 @@ private struct WebsiteRulesSettingsView: View {
             }
             .frame(maxHeight: .infinity)
 
+            Label("Website blocking supports only Chromium- and Safari-based browsers.", systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             if coordinator.activeProfile == nil {
                 Text("Select an active profile to manage blocked websites.")
                     .font(.caption)
@@ -220,11 +331,13 @@ private struct WebsiteRulesSettingsView: View {
                         coordinator.activeProfile == nil
                             || pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     )
+                    .pointingHandCursor()
 
                 Button("Delete Selected") {
                     deleteSelectedRule()
                 }
                 .disabled(selectedWebsiteRow == nil)
+                .pointingHandCursor()
             }
         }
     }
@@ -336,6 +449,7 @@ private struct AppRulesSettingsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
+                        .pointingHandCursor()
                     }
                     .width(110)
                 }
@@ -370,6 +484,7 @@ private struct AppRulesSettingsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(blockedBundleIdentifiers.contains(app.bundleIdentifier) ? .red : .accentColor)
+                        .pointingHandCursor()
                     }
                     .width(110)
                 }
@@ -413,6 +528,7 @@ private struct TimerSettingsView: View {
     }
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var coordinator: AppCoordinator
     @Query private var timerConfigs: [TimerConfig]
 
@@ -424,6 +540,7 @@ private struct TimerSettingsView: View {
     @State private var lockedMode = false
     @State private var pin = ""
     @State private var selectedPreset: TimerPresetKind = .pomodoro
+    @State private var isLoadingConfig = false
 
     private let presets: [TimerPreset] = [
         TimerPreset(
@@ -478,11 +595,48 @@ private struct TimerSettingsView: View {
         autoStopAfterRounds > 0 ? "\(autoStopAfterRounds) rounds" : "Off"
     }
 
+    private var configuredTotalTimeText: String {
+        guard let totalMinutes = configuredTotalMinutes else { return "∞" }
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        if hours > 0 && minutes > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+
+        if hours > 0 {
+            return "\(hours)h"
+        }
+
+        return "\(minutes)m"
+    }
+
+    private var configuredTotalMinutes: Int? {
+        guard autoStopAfterRounds > 0 else { return nil }
+
+        let completedRoundsBeforeStop = autoStopAfterRounds
+        let longBreaksBeforeStop = max(0, (completedRoundsBeforeStop - 1) / max(1, roundsBeforeLongBreak))
+        let totalBreaksBeforeStop = max(0, completedRoundsBeforeStop - 1)
+        let shortBreaksBeforeStop = max(0, totalBreaksBeforeStop - longBreaksBeforeStop)
+
+        return (completedRoundsBeforeStop * workMinutes)
+            + (shortBreaksBeforeStop * shortBreakMinutes)
+            + (longBreaksBeforeStop * longBreakMinutes)
+    }
+
     private var isCustomPreset: Bool {
         selectedPreset == .custom
     }
 
+    private var palette: SettingsPagePalette {
+        SettingsPagePalette(colorScheme: colorScheme)
+    }
+
     var body: some View {
+        timerContent
+    }
+
+    private var timerContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Timer")
@@ -502,7 +656,9 @@ private struct TimerSettingsView: View {
                     cycleCard
                     securityCard
                     startupCard
-                    saveButton
+                    Text("Changes save automatically.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(16)
@@ -512,8 +668,8 @@ private struct TimerSettingsView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.95, green: 0.95, blue: 0.96),
-                            Color(red: 0.91, green: 0.92, blue: 0.93)
+                            palette.backgroundStart,
+                            palette.backgroundEnd
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -522,11 +678,41 @@ private struct TimerSettingsView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onAppear(perform: load)
-        .onChange(of: coordinator.activeProfile?.id) {
-            load()
-        }
-        .onChange(of: timerConfigs.count) {
-            load()
+        .modifier(TimerAutoSaveModifier(view: self))
+    }
+
+    private struct TimerAutoSaveModifier: ViewModifier {
+        let view: TimerSettingsView
+
+        func body(content: Content) -> some View {
+            content
+                .onChange(of: view.coordinator.activeProfile?.id) {
+                    view.load()
+                }
+                .onChange(of: view.timerConfigs.count) {
+                    view.load()
+                }
+                .onChange(of: view.workMinutes) {
+                    view.saveAutomatically()
+                }
+                .onChange(of: view.shortBreakMinutes) {
+                    view.saveAutomatically()
+                }
+                .onChange(of: view.longBreakMinutes) {
+                    view.saveAutomatically()
+                }
+                .onChange(of: view.roundsBeforeLongBreak) {
+                    view.saveAutomatically()
+                }
+                .onChange(of: view.autoStopAfterRounds) {
+                    view.saveAutomatically()
+                }
+                .onChange(of: view.lockedMode) {
+                    view.saveAutomatically()
+                }
+                .onChange(of: view.selectedPreset) {
+                    view.saveAutomatically()
+                }
         }
     }
 
@@ -544,6 +730,7 @@ private struct TimerSettingsView: View {
                 summaryPill(text: "Short break \(shortBreakMinutes)m")
                 summaryPill(text: "Long break \(longBreakMinutes)m")
                 summaryPill(text: "\(roundsBeforeLongBreak) rounds/cycle")
+                summaryPill(text: "Total \(configuredTotalTimeText)")
             }
 
             Text("One full cycle is about \(cycleEstimateMinutes) minutes.")
@@ -572,17 +759,18 @@ private struct TimerSettingsView: View {
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(selected ? Color.accentColor.opacity(0.18) : Color.white.opacity(0.6))
+                                .fill(selected ? Color.accentColor.opacity(colorScheme == .dark ? 0.28 : 0.18) : palette.secondarySurface)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .strokeBorder(
-                                    selected ? Color.accentColor.opacity(0.65) : Color.black.opacity(0.08),
+                                    selected ? Color.accentColor.opacity(colorScheme == .dark ? 0.78 : 0.65) : palette.secondarySurfaceStroke,
                                     lineWidth: selected ? 1.2 : 0.8
                                 )
                         )
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                 }
             }
         }
@@ -632,6 +820,7 @@ private struct TimerSettingsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .pointingHandCursor()
             }
         }
     }
@@ -644,17 +833,6 @@ private struct TimerSettingsView: View {
                 coordinator.setLaunchAtLogin(enabled: value)
             }))
         }
-    }
-
-    private var saveButton: some View {
-        Button {
-            save()
-        } label: {
-            Label("Save Timer Settings", systemImage: "checkmark.circle.fill")
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
     }
 
     private func card<Content: View>(
@@ -676,13 +854,13 @@ private struct TimerSettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.78))
+                .fill(palette.cardFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.92), lineWidth: 1)
+                .strokeBorder(palette.cardStroke, lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.04), radius: 8, y: 3)
+        .shadow(color: palette.cardShadow, radius: 8, y: 3)
     }
 
     private func minuteStepperRow(
@@ -713,11 +891,11 @@ private struct TimerSettingsView: View {
             .padding(.vertical, 5)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.72))
+                    .fill(palette.chipFill)
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.95), lineWidth: 0.8)
+                    .strokeBorder(palette.chipStroke, lineWidth: 0.8)
             )
     }
 
@@ -757,6 +935,8 @@ private struct TimerSettingsView: View {
     }
 
     private func load() {
+        isLoadingConfig = true
+        defer { isLoadingConfig = false }
         guard let config = activeConfig else { return }
         selectedPreset = config.preset
 
@@ -770,6 +950,11 @@ private struct TimerSettingsView: View {
         if selectedPreset != .custom {
             applyPresetValues(for: selectedPreset, animated: false)
         }
+    }
+
+    private func saveAutomatically() {
+        guard !isLoadingConfig else { return }
+        save()
     }
 
     private func save() {
@@ -906,10 +1091,12 @@ private struct SchedulesSettingsView: View {
 
                 Button("Add") { addSchedule() }
                     .disabled(coordinator.activeProfile == nil || !canAddSchedule)
+                    .pointingHandCursor()
                 Button("Delete Selected", role: .destructive) {
                     deleteSelectedSchedule()
                 }
                 .disabled(selectedSchedule == nil)
+                .pointingHandCursor()
             }
 
             if recurrence == .customWeekdays {
@@ -920,6 +1107,7 @@ private struct SchedulesSettingsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(selectedWeekdays.contains(day.number) ? .accentColor : .gray.opacity(0.45))
+                        .pointingHandCursor()
                     }
                 }
                 .padding(.leading, recurrencePickerWidth + scheduleFormSpacing)
@@ -1080,6 +1268,7 @@ private struct StatsSettingsView: View {
         let weeks: [[HeatmapDay]]
     }
 
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var coordinator: AppCoordinator
     @Query(sort: \Profile.name) private var profiles: [Profile]
     @Query(sort: \SessionRecord.startedAt) private var sessionRecords: [SessionRecord]
@@ -1115,6 +1304,10 @@ private struct StatsSettingsView: View {
     private var yearRecords: [SessionRecord] {
         let range = yearRange
         return sessionRecords.filter { $0.startedAt >= range.start && $0.startedAt < range.end }
+    }
+
+    private var palette: SettingsPagePalette {
+        SettingsPagePalette(colorScheme: colorScheme)
     }
 
     private var totalYearSeconds: Int {
@@ -1213,8 +1406,8 @@ private struct StatsSettingsView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.95, green: 0.95, blue: 0.96),
-                            Color(red: 0.91, green: 0.92, blue: 0.93)
+                            palette.backgroundStart,
+                            palette.backgroundEnd
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -1319,7 +1512,7 @@ private struct StatsSettingsView: View {
                                     .overlay(
                                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                                             .strokeBorder(
-                                                Color.black.opacity(day.isInCurrentYear ? 0.06 : 0),
+                                                day.isInCurrentYear ? palette.contributionStroke : .clear,
                                                 lineWidth: 0.4
                                             )
                                     )
@@ -1341,7 +1534,7 @@ private struct StatsSettingsView: View {
                         .frame(width: heatmapCellSize, height: heatmapCellSize)
                         .overlay(
                             RoundedRectangle(cornerRadius: 2.2, style: .continuous)
-                                .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.4)
+                                .strokeBorder(palette.contributionStroke, lineWidth: 0.4)
                         )
                 }
                 Text("More")
@@ -1373,20 +1566,13 @@ private struct StatsSettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.72))
+                .fill(palette.cardFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.9), Color.white.opacity(0.3)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+                .strokeBorder(palette.cardStroke, lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.06), radius: 10, y: 4)
+        .shadow(color: palette.cardShadow, radius: 10, y: 4)
     }
 
     private func metricTile(label: String, value: String) -> some View {
@@ -1402,14 +1588,6 @@ private struct StatsSettingsView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(red: 0.95, green: 0.97, blue: 0.99))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.86), lineWidth: 0.8)
-        )
     }
 
     private func donutAngles(for index: Int) -> (start: Angle, end: Angle) {
@@ -1453,9 +1631,24 @@ private struct StatsSettingsView: View {
     }
 
     private func contributionLegendColor(level: Int) -> Color {
+        if colorScheme == .dark {
+            switch level {
+            case 0:
+                return palette.contributionEmpty
+            case 1:
+                return Color(red: 0.28, green: 0.38, blue: 0.56)
+            case 2:
+                return Color(red: 0.35, green: 0.49, blue: 0.73)
+            case 3:
+                return Color(red: 0.43, green: 0.61, blue: 0.87)
+            default:
+                return Color(red: 0.55, green: 0.72, blue: 0.98)
+            }
+        }
+
         switch level {
         case 0:
-            return Color(red: 0.92, green: 0.93, blue: 0.94)
+            return palette.contributionEmpty
         case 1:
             return Color(red: 0.81, green: 0.87, blue: 0.98)
         case 2:
