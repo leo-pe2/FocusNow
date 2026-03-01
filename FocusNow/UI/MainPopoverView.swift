@@ -16,6 +16,13 @@ struct MainPopoverView: View {
             Text(coordinator.timerString)
                 .font(.system(size: 42, weight: .semibold, design: .monospaced))
                 .frame(maxWidth: .infinity, alignment: .center)
+                .overlay(alignment: .topTrailing) {
+                    Text(superscriptDigits(coordinator.roundsLeftExponentText))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .offset(x: -44, y: 6)
+                        .help(coordinator.roundsLeftHelpText)
+                }
 
             primaryControlsRow
 
@@ -26,13 +33,6 @@ struct MainPopoverView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if let roundsLeftLabel = coordinator.roundsLeftLabel {
-                Text(roundsLeftLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
             }
 
             lockedStopSection
@@ -205,6 +205,23 @@ struct MainPopoverView: View {
     private func submitLockedStopPIN() {
         coordinator.stopSessionWithPIN(lockedStopPIN)
         lockedStopPIN = ""
+    }
+
+    private func superscriptDigits(_ text: String) -> String {
+        let mapping: [Character: Character] = [
+            "0": "⁰",
+            "1": "¹",
+            "2": "²",
+            "3": "³",
+            "4": "⁴",
+            "5": "⁵",
+            "6": "⁶",
+            "7": "⁷",
+            "8": "⁸",
+            "9": "⁹"
+        ]
+
+        return String(text.map { mapping[$0] ?? $0 })
     }
 
     private func openSettingsWindow() {

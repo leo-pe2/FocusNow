@@ -10,6 +10,7 @@ final class AppCoordinator: ObservableObject {
     @Published private(set) var activeProfile: Profile?
     @Published private(set) var availableProfiles: [Profile] = []
     @Published private(set) var idleConfiguredWorkSeconds: Int = 25 * 60
+    @Published private(set) var idleConfiguredMaxFocusRounds: Int = 0
     @Published private(set) var nextScheduleDate: Date?
     @Published var requiresLockedPinPrompt = false
     @Published var lastErrorMessage: String?
@@ -91,15 +92,21 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    var roundsLeftLabel: String? {
-        guard sessionSnapshot.isRunning else { return nil }
+    var roundsLeftExponentText: String {
+        let maxRounds = effectiveMaxFocusRounds
+        guard maxRounds > 0 else { return "∞" }
 
-        if sessionSnapshot.maxFocusRounds <= 0 {
-            return "Rounds left: ∞"
+        let remaining = max(0, maxRounds - sessionSnapshot.completedPomodoros)
+        return "\(remaining)"
+    }
+
+    var roundsLeftHelpText: String {
+        let maxRounds = effectiveMaxFocusRounds
+        guard maxRounds > 0 else {
+            return "Rounds left: infinite. Auto-stop after rounds is turned off."
         }
 
-        let remaining = max(0, sessionSnapshot.maxFocusRounds - sessionSnapshot.completedPomodoros)
-        return "Rounds left: \(remaining)"
+        return "Rounds left until auto-stop. The session ends after \(maxRounds) completed focus rounds."
     }
 
     func startSession(profileName: String?, manualWorkSeconds: Int?) {
@@ -441,11 +448,21 @@ final class AppCoordinator: ObservableObject {
     private func refreshIdleTimerDisplay() {
         guard let activeProfile else {
             idleConfiguredWorkSeconds = 25 * 60
+            idleConfiguredMaxFocusRounds = 0
             return
         }
 
         let config = try? profileManager.timerConfig(for: activeProfile.id)
         idleConfiguredWorkSeconds = max(1, config?.workSeconds ?? 25 * 60)
+        idleConfiguredMaxFocusRounds = max(0, config?.maxFocusRounds ?? 0)
+    }
+
+    private var effectiveMaxFocusRounds: Int {
+        if sessionSnapshot.isRunning {
+            return max(0, sessionSnapshot.maxFocusRounds)
+        }
+
+        return max(0, idleConfiguredMaxFocusRounds)
     }
 
     private func registerSystemObservers() {
