@@ -20,7 +20,7 @@ struct MainPopoverView: View {
                     Text(superscriptDigits(coordinator.roundsLeftExponentText))
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .offset(x: -44, y: 6)
+                        .offset(x: -40, y: 10)
                         .help(coordinator.roundsLeftHelpText)
                 }
 
@@ -114,20 +114,29 @@ struct MainPopoverView: View {
     }
 
     private var scheduleSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Next Schedule")
-                .font(.caption)
+        HStack(spacing: 8) {
+            Text("Next Schedule:")
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let nextScheduleDate = coordinator.nextScheduleDate {
-                Text(nextScheduleDate.formatted(date: .abbreviated, time: .shortened))
-                    .font(.subheadline)
-            } else {
-                Text("No active schedule")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            Group {
+                if let nextScheduleDate = coordinator.nextScheduleDate {
+                    Text(nextScheduleDate.formatted(date: .abbreviated, time: .shortened))
+                } else {
+                    Text("No active schedule")
+                        .foregroundStyle(.secondary)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+        .font(.caption)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+        )
     }
 
     private var actionButtonsRow: some View {
@@ -135,7 +144,7 @@ struct MainPopoverView: View {
             Button {
                 openSettingsWindow()
             } label: {
-                Label("Open Settings…", systemImage: "arrow.up.forward.app")
+                Label("Open Settings", systemImage: "arrow.up.forward.app")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
                     .background(
