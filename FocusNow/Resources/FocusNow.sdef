@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary title="FocusNow Scripting Definition">
+    <suite name="FocusNow Suite" code="FCNW" description="FocusNow automation commands">
+        <command name="start session" code="FCNWsstr" description="Start a session">
+            <cocoa class="StartSessionScriptCommand"/>
+            <parameter name="profile" code="pnam" type="text" optional="yes"/>
+        </command>
+        <command name="stop session" code="FCNWsstp" description="Stop the active session">
+            <cocoa class="StopSessionScriptCommand"/>
+        </command>
+        <command name="switch profile" code="FCNWsprf" description="Switch active profile">
+            <cocoa class="SwitchProfileScriptCommand"/>
+            <parameter name="name" code="pnam" type="text"/>
+        </command>
+        <command name="get session state" code="FCNWgsts" description="Return session state string">
+            <cocoa class="GetSessionStateScriptCommand"/>
+            <result type="text"/>
+        </command>
+        <command name="get active profile" code="FCNWgapr" description="Return active profile name">
+            <cocoa class="GetActiveProfileScriptCommand"/>
+            <result type="text"/>
+        </command>
+    </suite>
+</dictionary>

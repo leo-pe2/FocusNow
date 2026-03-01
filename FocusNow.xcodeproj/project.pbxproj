@@ -6,11 +6,33 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A10000612F55000100ABC7A7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D7D6EFAC2F547E8600ABC7A7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D7D6EFB32F547E8600ABC7A7;
+			remoteInfo = FocusNow;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		A10000012F55000100ABC7A7 /* FocusNowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FocusNowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000022F55000100ABC7A7 /* FocusNowUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FocusNowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D7D6EFB42F547E8600ABC7A7 /* FocusNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FocusNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A10000112F55000100ABC7A7 /* FocusNowTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FocusNowTests;
+			sourceTree = "<group>";
+		};
+		A10000122F55000100ABC7A7 /* FocusNowUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FocusNowUITests;
+			sourceTree = "<group>";
+		};
 		D7D6EFB62F547E8600ABC7A7 /* FocusNow */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = FocusNow;
@@ -19,6 +41,20 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A10000212F55000100ABC7A7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000222F55000100ABC7A7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D7D6EFB12F547E8600ABC7A7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -33,6 +69,8 @@
 			isa = PBXGroup;
 			children = (
 				D7D6EFB62F547E8600ABC7A7 /* FocusNow */,
+				A10000112F55000100ABC7A7 /* FocusNowTests */,
+				A10000122F55000100ABC7A7 /* FocusNowUITests */,
 				D7D6EFB52F547E8600ABC7A7 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +79,8 @@
 			isa = PBXGroup;
 			children = (
 				D7D6EFB42F547E8600ABC7A7 /* FocusNow.app */,
+				A10000012F55000100ABC7A7 /* FocusNowTests.xctest */,
+				A10000022F55000100ABC7A7 /* FocusNowUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +88,52 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A10000512F55000100ABC7A7 /* FocusNowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A100008112F55000100ABC7A7 /* Build configuration list for PBXNativeTarget "FocusNowTests" */;
+			buildPhases = (
+				A10000412F55000100ABC7A7 /* Sources */,
+				A10000212F55000100ABC7A7 /* Frameworks */,
+				A10000312F55000100ABC7A7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A10000632F55000100ABC7A7 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A10000112F55000100ABC7A7 /* FocusNowTests */,
+			);
+			name = FocusNowTests;
+			packageProductDependencies = (
+			);
+			productName = FocusNowTests;
+			productReference = A10000012F55000100ABC7A7 /* FocusNowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A10000522F55000100ABC7A7 /* FocusNowUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A100008212F55000100ABC7A7 /* Build configuration list for PBXNativeTarget "FocusNowUITests" */;
+			buildPhases = (
+				A10000422F55000100ABC7A7 /* Sources */,
+				A10000222F55000100ABC7A7 /* Frameworks */,
+				A10000322F55000100ABC7A7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A10000622F55000100ABC7A7 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A10000122F55000100ABC7A7 /* FocusNowUITests */,
+			);
+			name = FocusNowUITests;
+			packageProductDependencies = (
+			);
+			productName = FocusNowUITests;
+			productReference = A10000022F55000100ABC7A7 /* FocusNowUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		D7D6EFB32F547E8600ABC7A7 /* FocusNow */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D7D6EFBF2F547E8700ABC7A7 /* Build configuration list for PBXNativeTarget "FocusNow" */;
@@ -80,6 +166,14 @@
 				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					A10000512F55000100ABC7A7 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = D7D6EFB32F547E8600ABC7A7;
+					};
+					A10000522F55000100ABC7A7 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = D7D6EFB32F547E8600ABC7A7;
+					};
 					D7D6EFB32F547E8600ABC7A7 = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -100,11 +194,27 @@
 			projectRoot = "";
 			targets = (
 				D7D6EFB32F547E8600ABC7A7 /* FocusNow */,
+				A10000512F55000100ABC7A7 /* FocusNowTests */,
+				A10000522F55000100ABC7A7 /* FocusNowUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A10000312F55000100ABC7A7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000322F55000100ABC7A7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D7D6EFB22F547E8600ABC7A7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +225,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A10000412F55000100ABC7A7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000422F55000100ABC7A7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D7D6EFB02F547E8600ABC7A7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,7 +248,100 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A10000622F55000100ABC7A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D7D6EFB32F547E8600ABC7A7 /* FocusNow */;
+			targetProxy = A10000612F55000100ABC7A7 /* PBXContainerItemProxy */;
+		};
+		A10000632F55000100ABC7A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D7D6EFB32F547E8600ABC7A7 /* FocusNow */;
+			targetProxy = A10000612F55000100ABC7A7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		A100007112F55000100ABC7A7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mdm.FocusNowTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FocusNow.app/Contents/MacOS/FocusNow";
+			};
+			name = Debug;
+		};
+		A100007122F55000100ABC7A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mdm.FocusNowTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FocusNow.app/Contents/MacOS/FocusNow";
+			};
+			name = Release;
+		};
+		A100007212F55000100ABC7A7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mdm.FocusNowUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = FocusNow;
+			};
+			name = Debug;
+		};
+		A100007222F55000100ABC7A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mdm.FocusNowUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = FocusNow;
+			};
+			name = Release;
+		};
 		D7D6EFBD2F547E8700ABC7A7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -178,7 +395,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -235,7 +452,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -251,15 +468,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "FocusNow-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = mdm.FocusNow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -281,15 +500,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "FocusNow-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = mdm.FocusNow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -306,6 +527,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A100008112F55000100ABC7A7 /* Build configuration list for PBXNativeTarget "FocusNowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A100007112F55000100ABC7A7 /* Debug */,
+				A100007122F55000100ABC7A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A100008212F55000100ABC7A7 /* Build configuration list for PBXNativeTarget "FocusNowUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A100007212F55000100ABC7A7 /* Debug */,
+				A100007222F55000100ABC7A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		D7D6EFAF2F547E8600ABC7A7 /* Build configuration list for PBXProject "FocusNow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
