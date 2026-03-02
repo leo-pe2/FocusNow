@@ -150,6 +150,8 @@ private struct SettingsPagePalette {
 }
 
 private struct ProfilesSettingsView: View {
+    private let maxProfileCount = 5
+
     struct ProfileRow: Identifiable {
         let id: UUID
         let name: String
@@ -182,6 +184,10 @@ private struct ProfilesSettingsView: View {
         return profileRows.first { $0.id == selectedProfileID }
     }
 
+    private var hasReachedProfileLimit: Bool {
+        profiles.count >= maxProfileCount
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -211,11 +217,20 @@ private struct ProfilesSettingsView: View {
 
             HStack {
                 TextField("New profile", text: $profileName)
+                    .disabled(hasReachedProfileLimit)
                 Button("Add") {
                     addProfile()
                 }
-                .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(
+                    profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasReachedProfileLimit
+                )
                 .pointingHandCursor()
+            }
+
+            if hasReachedProfileLimit {
+                Text("Maximum of 5 profiles reached.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             HStack {
@@ -240,6 +255,7 @@ private struct ProfilesSettingsView: View {
     private func addProfile() {
         let trimmed = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        guard profiles.count < maxProfileCount else { return }
 
         let profile = Profile(name: trimmed)
         modelContext.insert(profile)
@@ -778,9 +794,9 @@ private struct TimerSettingsView: View {
 
     private var timingCard: some View {
         card(title: "Durations", icon: "clock.badge") {
-            minuteStepperRow(title: "Work", value: $workMinutes, range: 5...180)
+            minuteStepperRow(title: "Work", value: $workMinutes, range: 1...180)
             minuteStepperRow(title: "Short break", value: $shortBreakMinutes, range: 1...30)
-            minuteStepperRow(title: "Long break", value: $longBreakMinutes, range: 5...60)
+            minuteStepperRow(title: "Long break", value: $longBreakMinutes, range: 1...60)
 
             if !isCustomPreset {
                 Text("Switch to Custom preset to edit durations.")
@@ -1420,7 +1436,7 @@ private struct StatsSettingsView: View {
     private var statsOverviewCard: some View {
         dashboardCard(
             title: "Focus Overview",
-            subtitle: "\(currentYear) at a glance"
+            subtitle: nil
         ) {
             HStack(alignment: .top, spacing: 10) {
                 metricTile(label: "This Month", value: formatDuration(monthSeconds))
@@ -1547,7 +1563,7 @@ private struct StatsSettingsView: View {
 
     private func dashboardCard<Content: View>(
         title: String,
-        subtitle: String,
+        subtitle: String?,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1555,9 +1571,11 @@ private struct StatsSettingsView: View {
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             content()

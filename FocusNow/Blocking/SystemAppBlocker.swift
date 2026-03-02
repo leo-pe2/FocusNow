@@ -3,10 +3,15 @@ import Foundation
 
 @MainActor
 final class SystemAppBlocker: AppBlocker {
+    private static let notificationCooldown: TimeInterval = 30
+
     private let notificationManager: NotificationManager
+    private let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
 
     private var launchObserver: NSObjectProtocol?
     private var reconcileTask: Task<Void, Never>?
+    private var terminationTasks: [pid_t: Task<Void, Never>] = [:]
+    private var lastNotificationDateByBundleIdentifier: [String: Date] = [:]
     private var blockedBundleIdentifiers: Set<String> = []
     private var currentStatus: BlockerStatus = .inactive
 
@@ -16,9 +21,10 @@ final class SystemAppBlocker: AppBlocker {
 
     deinit {
         if let launchObserver {
-            NotificationCenter.default.removeObserver(launchObserver)
+            workspaceNotificationCenter.removeObserver(launchObserver)
         }
         reconcileTask?.cancel()
+        terminationTasks.values.forEach { $0.cancel() }
     }
 
     func enable(profile: AppBlockingProfile) {
@@ -36,6 +42,7 @@ final class SystemAppBlocker: AppBlocker {
 
     func disable() {
         blockedBundleIdentifiers = []
+        lastNotificationDateByBundleIdentifier.removeAll()
         currentStatus = .inactive
         stopObservers()
     }
@@ -46,7 +53,7 @@ final class SystemAppBlocker: AppBlocker {
 
     private func startObserversIfNeeded() {
         if launchObserver == nil {
-            launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            launchObserver = workspaceNotificationCenter.addObserver(
                 forName: NSWorkspace.didLaunchApplicationNotification,
                 object: nil,
                 queue: .main
@@ -79,11 +86,13 @@ final class SystemAppBlocker: AppBlocker {
 
     private func stopObservers() {
         if let launchObserver {
-            NotificationCenter.default.removeObserver(launchObserver)
+            workspaceNotificationCenter.removeObserver(launchObserver)
             self.launchObserver = nil
         }
         reconcileTask?.cancel()
         reconcileTask = nil
+        terminationTasks.values.forEach { $0.cancel() }
+        terminationTasks.removeAll()
     }
 
     private func terminateBlockedRunningAppsIfNeeded() {
@@ -98,12 +107,58 @@ final class SystemAppBlocker: AppBlocker {
         guard blockedBundleIdentifiers.contains(bundleIdentifier) else { return }
         guard bundleIdentifier != Bundle.main.bundleIdentifier else { return }
         guard app.activationPolicy == .regular else { return }
+        let processIdentifier = app.processIdentifier
+        guard processIdentifier > 0 else { return }
+        guard terminationTasks[processIdentifier] == nil else { return }
 
-        _ = app.terminate()
+        terminationTasks[processIdentifier] = Task { @MainActor [weak self] in
+            await self?.attemptTermination(
+                app: app,
+                bundleIdentifier: bundleIdentifier,
+                processIdentifier: processIdentifier
+            )
+        }
+    }
 
+    private func attemptTermination(
+        app: NSRunningApplication,
+        bundleIdentifier: String,
+        processIdentifier: pid_t
+    ) async {
+        defer {
+            terminationTasks[processIdentifier] = nil
+        }
+
+        guard blockedBundleIdentifiers.contains(bundleIdentifier) else { return }
+
+        if !app.isTerminated {
+            _ = app.terminate()
+            try? await Task.sleep(for: .milliseconds(600))
+        }
+
+        if !app.isTerminated {
+            _ = app.forceTerminate()
+            try? await Task.sleep(for: .milliseconds(600))
+        }
+
+        guard app.isTerminated else { return }
+        sendBlockedNotificationIfNeeded(
+            bundleIdentifier: bundleIdentifier,
+            appName: app.localizedName ?? bundleIdentifier
+        )
+    }
+
+    private func sendBlockedNotificationIfNeeded(bundleIdentifier: String, appName: String) {
+        let now = Date()
+        if let lastNotificationDate = lastNotificationDateByBundleIdentifier[bundleIdentifier],
+           now.timeIntervalSince(lastNotificationDate) < Self.notificationCooldown {
+            return
+        }
+
+        lastNotificationDateByBundleIdentifier[bundleIdentifier] = now
         notificationManager.send(
             title: "FocusNow",
-            body: "\(app.localizedName ?? bundleIdentifier) was blocked during focus time."
+            body: "\(appName) was blocked during focus time."
         )
     }
 }

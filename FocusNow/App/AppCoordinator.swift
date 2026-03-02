@@ -22,6 +22,7 @@ final class AppCoordinator: ObservableObject {
     private let sessionEngine = SessionEngine()
     private let statsManager: StatsManager
     private let blockingCoordinator: BlockingCoordinator
+    private let notificationManager: NotificationManager
     private let keychainPINStore = KeychainPINStore()
     private let launchAtLoginManager = LaunchAtLoginManager()
 
@@ -31,6 +32,7 @@ final class AppCoordinator: ObservableObject {
 
     init(modelContext: ModelContext, notificationManager: NotificationManager) {
         self.modelContext = modelContext
+        self.notificationManager = notificationManager
         self.profileManager = ProfileManager(modelContext: modelContext)
         self.statsManager = StatsManager(modelContext: modelContext)
 
@@ -38,6 +40,7 @@ final class AppCoordinator: ObservableObject {
         let appBlocker = SystemAppBlocker(notificationManager: notificationManager)
         self.blockingCoordinator = BlockingCoordinator(websiteBlocker: websiteBlocker, appBlocker: appBlocker)
 
+        notificationManager.prepareAuthorizationIfNeeded()
         bootstrap()
         subscribeToSessionUpdates()
         registerSystemObservers()
@@ -393,6 +396,23 @@ final class AppCoordinator: ObservableObject {
                new.completedPomodoros >= new.maxFocusRounds {
                 stopSession(reason: .completed, allowDuringLockedMode: true)
                 return
+            }
+
+            if old.phase == .runningWork {
+                switch new.phase {
+                case .runningShortBreak:
+                    notificationManager.send(
+                        title: "Short Break Started",
+                        body: "Focus round complete. Time for a short break."
+                    )
+                case .runningLongBreak:
+                    notificationManager.send(
+                        title: "Long Break Started",
+                        body: "Cycle complete. Time for a long break."
+                    )
+                default:
+                    break
+                }
             }
 
             if new.phase == .runningWork {

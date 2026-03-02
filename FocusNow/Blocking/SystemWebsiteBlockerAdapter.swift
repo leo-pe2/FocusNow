@@ -3,24 +3,18 @@ import Foundation
 
 @MainActor
 final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
-    private enum BrowserResolution {
-        case unresolved
-        case unsupported(String)
-        case supported(BrowserTarget)
-    }
-
-    private enum BrowserKind {
+    private enum BrowserKind: Sendable, Hashable {
         case safari
         case chromium
     }
 
-    private struct BrowserTarget {
+    private struct BrowserTarget: Sendable, Hashable {
         let bundleIdentifier: String
         let displayName: String
         let kind: BrowserKind
     }
 
-    private enum EnforcementResult {
+    private enum EnforcementResult: Sendable {
         case success
         case permissionDenied
         case browserNotFound
@@ -28,10 +22,42 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
         case failed(code: Int?, message: String?)
     }
 
+    private static let supportedBrowserCandidates: [BrowserTarget] = [
+        BrowserTarget(bundleIdentifier: "com.apple.Safari", displayName: "Safari", kind: .safari),
+        BrowserTarget(
+            bundleIdentifier: "com.apple.SafariTechnologyPreview",
+            displayName: "Safari Technology Preview",
+            kind: .safari
+        ),
+        BrowserTarget(bundleIdentifier: "com.google.Chrome", displayName: "Google Chrome", kind: .chromium),
+        BrowserTarget(
+            bundleIdentifier: "com.google.Chrome.canary",
+            displayName: "Google Chrome Canary",
+            kind: .chromium
+        ),
+        BrowserTarget(bundleIdentifier: "org.chromium.Chromium", displayName: "Chromium", kind: .chromium),
+        BrowserTarget(bundleIdentifier: "com.brave.Browser", displayName: "Brave", kind: .chromium),
+        BrowserTarget(bundleIdentifier: "com.microsoft.edgemac", displayName: "Microsoft Edge", kind: .chromium),
+        BrowserTarget(
+            bundleIdentifier: "com.microsoft.edgemac.Beta",
+            displayName: "Microsoft Edge Beta",
+            kind: .chromium
+        ),
+        BrowserTarget(
+            bundleIdentifier: "com.microsoft.edgemac.Dev",
+            displayName: "Microsoft Edge Dev",
+            kind: .chromium
+        ),
+        BrowserTarget(bundleIdentifier: "com.operasoftware.Opera", displayName: "Opera", kind: .chromium),
+        BrowserTarget(bundleIdentifier: "com.operasoftware.OperaGX", displayName: "Opera GX", kind: .chromium),
+        BrowserTarget(bundleIdentifier: "com.vivaldi.Vivaldi", displayName: "Vivaldi", kind: .chromium),
+        BrowserTarget(bundleIdentifier: "company.thebrowser.Browser", displayName: "Arc", kind: .chromium)
+    ]
+
     private var currentStatus: BlockerStatus = .inactive
     private var blockedHosts: [String] = []
     private var enforcementTask: Task<Void, Never>?
-    private var targetBrowser: BrowserTarget?
+    private var targetBrowsers: [BrowserTarget] = []
     private var automationPermissionDenied = false
 
     func enable(profile: WebsiteBlockingProfile) {
@@ -48,23 +74,17 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
             return
         }
 
-        let browserResolution = resolveDefaultBrowserTarget()
-        switch browserResolution {
-        case .unresolved:
+        let supportedBrowsers = resolveSupportedBrowserTargets()
+        guard !supportedBrowsers.isEmpty else {
             stopEnforcement()
-            currentStatus = .degraded("Could not resolve default browser")
+            currentStatus = .degraded(
+                "No supported browser found. Website blocking works in Safari and supported Chromium browsers."
+            )
             return
-        case .unsupported(let reason):
-            stopEnforcement()
-            currentStatus = .degraded(reason)
-            return
-        case .supported:
-            break
         }
-        guard case .supported(let browser) = browserResolution else { return }
 
         blockedHosts = normalized
-        targetBrowser = browser
+        targetBrowsers = supportedBrowsers
         automationPermissionDenied = false
         currentStatus = .active
 
@@ -74,7 +94,7 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
     func disable() {
         stopEnforcement()
         blockedHosts = []
-        targetBrowser = nil
+        targetBrowsers = []
         automationPermissionDenied = false
         currentStatus = .inactive
     }
@@ -86,50 +106,56 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
     private func startEnforcementLoop() {
         stopEnforcement()
 
-        guard let targetBrowser else { return }
         let hosts = blockedHosts
+        let browsers = targetBrowsers
+        guard !hosts.isEmpty, !browsers.isEmpty else { return }
 
-        enforcementTask = Task { [weak self] in
-            guard let self else { return }
+        let appleScriptSources = Dictionary(uniqueKeysWithValues: browsers.map {
+            ($0.bundleIdentifier, buildAppleScript(blockedHosts: hosts, target: $0))
+        })
+
+        enforcementTask = Task.detached(priority: .utility) { [weak self] in
+            var compiledScripts: [String: NSAppleScript] = [:]
 
             while !Task.isCancelled {
-                let result = self.enforceInDefaultBrowser(blockedHosts: hosts, target: targetBrowser)
+                var encounteredRecoverableFailure = false
 
-                switch result {
-                case .success:
-                    if !self.automationPermissionDenied, case .degraded = self.currentStatus {
-                        self.currentStatus = .active
+                for target in browsers {
+                    guard let appleScriptSource = appleScriptSources[target.bundleIdentifier] else { continue }
+                    var compiledScript = compiledScripts[target.bundleIdentifier]
+                    let result = Self.enforceInBrowser(
+                        compiledScript: &compiledScript,
+                        appleScriptSource: appleScriptSource,
+                        target: target
+                    )
+
+                    if let compiledScript {
+                        compiledScripts[target.bundleIdentifier] = compiledScript
+                    } else {
+                        compiledScripts.removeValue(forKey: target.bundleIdentifier)
                     }
 
-                case .permissionDenied:
-                    self.automationPermissionDenied = true
-                    self.currentStatus = .degraded(
-                        "Allow FocusNow to control \(targetBrowser.displayName). If no toggle exists yet, start a session once to trigger the macOS prompt, then check Privacy & Security > Automation."
-                    )
-                    self.stopEnforcement()
-                    return
+                    if case .failed = result {
+                        encounteredRecoverableFailure = true
+                    }
 
-                case .browserNotFound:
-                    self.currentStatus = .degraded(
-                        "Could not find \(targetBrowser.displayName). Re-select your default browser in System Settings > Desktop & Dock."
-                    )
-                    self.stopEnforcement()
-                    return
+                    let shouldStop = await MainActor.run { [weak self] in
+                        guard let self else { return true }
+                        return self.handleEnforcementResult(result, target: target)
+                    }
 
-                case .unsupportedBrowserModel:
-                    self.currentStatus = .degraded(
-                        "\(targetBrowser.displayName) does not expose tab automation; use Safari or a Chromium browser as default"
-                    )
-                    self.stopEnforcement()
-                    return
-
-                case .failed(let code, let message):
-                    self.currentStatus = .degraded(
-                        "Could not enforce website blocking in \(targetBrowser.displayName)\(self.failureDetails(code: code, message: message))"
-                    )
+                    if shouldStop {
+                        return
+                    }
                 }
 
-                try? await Task.sleep(for: .seconds(1.5))
+                if !encounteredRecoverableFailure {
+                    await MainActor.run { [weak self] in
+                        self?.clearRecoverableFailureStatusIfNeeded()
+                    }
+                }
+
+                try? await Task.sleep(for: .seconds(1))
             }
         }
     }
@@ -139,23 +165,51 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
         enforcementTask = nil
     }
 
-    private func resolveDefaultBrowserTarget() -> BrowserResolution {
+    private func resolveSupportedBrowserTargets() -> [BrowserTarget] {
+        var resolved: [BrowserTarget] = []
+        var seenBundleIdentifiers = Set<String>()
+
+        if let defaultBrowser = resolveDefaultBrowserTarget() {
+            let key = defaultBrowser.bundleIdentifier.lowercased()
+            if seenBundleIdentifiers.insert(key).inserted {
+                resolved.append(defaultBrowser)
+            }
+        }
+
+        for candidate in Self.supportedBrowserCandidates {
+            guard let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: candidate.bundleIdentifier)
+            else {
+                continue
+            }
+
+            let bundleIdentifier = Bundle(url: applicationURL)?.bundleIdentifier ?? candidate.bundleIdentifier
+            let key = bundleIdentifier.lowercased()
+            guard seenBundleIdentifiers.insert(key).inserted else { continue }
+
+            let displayName = browserDisplayName(
+                applicationURL: applicationURL,
+                fallbackBundleIdentifier: candidate.displayName
+            )
+            let kind = detectBrowserKind(applicationURL: applicationURL, bundleIdentifier: bundleIdentifier) ?? candidate.kind
+            resolved.append(BrowserTarget(bundleIdentifier: bundleIdentifier, displayName: displayName, kind: kind))
+        }
+
+        return resolved
+    }
+
+    private func resolveDefaultBrowserTarget() -> BrowserTarget? {
         guard let appURL = defaultBrowserApplicationURL(),
-              let bundleIdentifier = Bundle(url: appURL)?.bundleIdentifier
+              let bundleIdentifier = Bundle(url: appURL)?.bundleIdentifier,
+              let kind = detectBrowserKind(applicationURL: appURL, bundleIdentifier: bundleIdentifier)
         else {
-            return .unresolved
+            return nil
         }
 
-        let displayName = defaultBrowserDisplayName(applicationURL: appURL, fallbackBundleIdentifier: bundleIdentifier)
-        guard let kind = detectBrowserKind(applicationURL: appURL, bundleIdentifier: bundleIdentifier) else {
-            return .unsupported("\(displayName) does not expose tab automation; use Safari or a Chromium browser as default")
-        }
-
-        return .supported(BrowserTarget(
+        return BrowserTarget(
             bundleIdentifier: bundleIdentifier,
-            displayName: displayName,
+            displayName: browserDisplayName(applicationURL: appURL, fallbackBundleIdentifier: bundleIdentifier),
             kind: kind
-        ))
+        )
     }
 
     private func defaultBrowserApplicationURL() -> URL? {
@@ -168,7 +222,7 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
         return appURL
     }
 
-    private func defaultBrowserDisplayName(applicationURL: URL, fallbackBundleIdentifier: String) -> String {
+    private func browserDisplayName(applicationURL: URL, fallbackBundleIdentifier: String) -> String {
         guard let bundle = Bundle(url: applicationURL) else {
             return fallbackBundleIdentifier
         }
@@ -180,13 +234,15 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
 
     private func detectBrowserKind(applicationURL: URL, bundleIdentifier: String) -> BrowserKind? {
         let loweredBundleIdentifier = bundleIdentifier.lowercased()
-        if loweredBundleIdentifier == "com.apple.safari" {
+        if loweredBundleIdentifier == "com.apple.safari"
+            || loweredBundleIdentifier == "com.apple.safaritechnologypreview" {
             return .safari
         }
 
         let resourcesURL = applicationURL.appendingPathComponent("Contents/Resources", isDirectory: true)
         let chromiumSdefPath = resourcesURL.appendingPathComponent("scripting.sdef").path
-        if FileManager.default.fileExists(atPath: chromiumSdefPath) || isLikelyChromiumBundleIdentifier(loweredBundleIdentifier) {
+        if FileManager.default.fileExists(atPath: chromiumSdefPath)
+            || isLikelyChromiumBundleIdentifier(loweredBundleIdentifier) {
             return .chromium
         }
 
@@ -261,13 +317,60 @@ final class SystemWebsiteBlockerAdapter: WebsiteBlocker {
         return host
     }
 
-    private func enforceInDefaultBrowser(blockedHosts: [String], target: BrowserTarget) -> EnforcementResult {
+    private func handleEnforcementResult(_ result: EnforcementResult, target: BrowserTarget) -> Bool {
+        switch result {
+        case .success:
+            return false
+
+        case .permissionDenied:
+            automationPermissionDenied = true
+            currentStatus = .degraded(
+                "Allow FocusNow to control \(target.displayName). If no toggle exists yet, start a session once to trigger the macOS prompt, then check Privacy & Security > Automation."
+            )
+            stopEnforcement()
+            return true
+
+        case .browserNotFound:
+            currentStatus = .degraded("Could not find \(target.displayName).")
+            stopEnforcement()
+            return true
+
+        case .unsupportedBrowserModel:
+            currentStatus = .degraded(
+                "\(target.displayName) does not expose the browser automation FocusNow needs."
+            )
+            stopEnforcement()
+            return true
+
+        case .failed(let code, let message):
+            currentStatus = .degraded(
+                "Could not enforce website blocking in \(target.displayName)\(failureDetails(code: code, message: message))"
+            )
+            return false
+        }
+    }
+
+    private func clearRecoverableFailureStatusIfNeeded() {
+        guard !automationPermissionDenied else { return }
+        guard case .degraded(let reason) = currentStatus else { return }
+        guard reason.hasPrefix("Could not enforce website blocking in ") else { return }
+        currentStatus = .active
+    }
+
+    nonisolated private static func enforceInBrowser(
+        compiledScript: inout NSAppleScript?,
+        appleScriptSource: String,
+        target: BrowserTarget
+    ) -> EnforcementResult {
         if NSRunningApplication.runningApplications(withBundleIdentifier: target.bundleIdentifier).isEmpty {
             return .success
         }
 
-        let appleScriptSource = buildAppleScript(blockedHosts: blockedHosts, target: target)
-        guard let script = NSAppleScript(source: appleScriptSource) else {
+        if compiledScript == nil {
+            compiledScript = NSAppleScript(source: appleScriptSource)
+        }
+
+        guard let script = compiledScript else {
             return .failed(code: nil, message: "AppleScript compilation failed")
         }
 

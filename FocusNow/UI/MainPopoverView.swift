@@ -22,20 +22,21 @@ struct MainPopoverView: View {
                     Text(superscriptDigits(coordinator.roundsLeftExponentText))
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .offset(x: -40, y: 10)
+                        .offset(x: -57, y: 10)
                         .help(coordinator.roundsLeftHelpText)
                 }
 
             primaryControlsRow
 
             if coordinator.sessionSnapshot.phase.isBreak {
-                Button("Skip Break") {
+                SlideActionButton(
+                    title: "Slide to skip break",
+                    tint: .accentColor
+                ) {
                     Task {
                         await coordinatorSkipBreak()
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .pointingHandCursor()
             }
 
             lockedStopSection
@@ -132,7 +133,10 @@ struct MainPopoverView: View {
         HStack(spacing: 8) {
             Text("Next Schedule:")
                 .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: coordinator.sessionSnapshot.isActive ? .center : .leading
+                )
 
             Group {
                 if let nextScheduleDate = coordinator.nextScheduleDate {
@@ -329,5 +333,83 @@ private struct OptionalKeyboardShortcut: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+private struct SlideActionButton: View {
+    let title: String
+    let tint: Color
+    let action: () -> Void
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var controlWidth: CGFloat = 0
+
+    private let height: CGFloat = 42
+    private let knobInset: CGFloat = 4
+
+    private var knobSize: CGFloat {
+        height - (knobInset * 2)
+    }
+
+    private var maximumOffset: CGFloat {
+        max(0, controlWidth - knobSize - (knobInset * 2))
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let liveWidth = max(0, geometry.size.width)
+
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(tint)
+                    .frame(width: knobSize + dragOffset + (knobInset * 2))
+
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(dragOffset > 12 ? Color.white : Color.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 48)
+
+                ZStack {
+                    Circle()
+                        .fill(tint)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: knobSize, height: knobSize)
+                .offset(x: knobInset + dragOffset)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            controlWidth = liveWidth
+                            dragOffset = min(max(0, value.translation.width), maximumOffset)
+                        }
+                        .onEnded { _ in
+                            if dragOffset >= maximumOffset * 0.82 {
+                                action()
+                            }
+
+                            withAnimation(.spring(response: 0.22, dampingFraction: 0.88)) {
+                                dragOffset = 0
+                            }
+                        }
+                )
+            }
+            .frame(height: height)
+            .onAppear {
+                controlWidth = liveWidth
+            }
+            .onChange(of: liveWidth) {
+                controlWidth = liveWidth
+                dragOffset = min(dragOffset, maximumOffset)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .pointingHandCursor()
     }
 }
