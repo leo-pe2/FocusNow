@@ -18,7 +18,10 @@ And the best part? No Subscription, No high price, Open Source and Native.
 - Lightweight macOS menu bar experience
 - No Data Collection, 100% offline
 
-<img width="1280" height="800" alt="Frame 1" src="https://github.com/user-attachments/assets/178c9633-2828-49a0-b690-7db763b185c2" />
-<img width="1280" height="800" alt="Frame 2" src="https://github.com/user-attachments/assets/0f155517-833b-450c-89f9-cb1bfb094d88" />
-<img width="1280" height="800" alt="Frame 3" src="https://github.com/user-attachments/assets/4f47f7ce-a805-410d-ae3c-d7caa8e39a78" />
+
+![Frame 1](https://github.com/user-attachments/assets/c2b334c9-af4f-487b-b2c3-414033ed92e1)
+![Frame 2](https://github.com/user-attachments/assets/4c3a33d6-ed6c-4a19-aecc-83ef6fe12e74)
+![Frame 3](https://github.com/user-attachments/assets/c131d27f-68d2-49bf-903f-504aa9db0c26)
+![Frame 4](https://github.com/user-attachments/assets/5ed453e9-5e11-409a-8651-4683394bc63e)
+
 
