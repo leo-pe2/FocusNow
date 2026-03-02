@@ -355,6 +355,13 @@ private struct SlideActionButton: View {
         max(0, controlWidth - knobSize - (knobInset * 2))
     }
 
+    private var titleOpacity: Double {
+        guard maximumOffset > 0 else { return 1 }
+        let fadeDistance = min(maximumOffset, 72)
+        let progress = min(1, dragOffset / fadeDistance)
+        return Double(1 - progress)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let liveWidth = max(0, geometry.size.width)
@@ -369,7 +376,8 @@ private struct SlideActionButton: View {
 
                 Text(title)
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(dragOffset > 12 ? Color.white : Color.primary)
+                    .foregroundStyle(Color.primary)
+                    .opacity(titleOpacity)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 48)
 

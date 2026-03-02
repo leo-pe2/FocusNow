@@ -3,21 +3,13 @@ import Foundation
 
 @MainActor
 final class SystemAppBlocker: AppBlocker {
-    private static let notificationCooldown: TimeInterval = 30
-
-    private let notificationManager: NotificationManager
     private let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
 
     private var launchObserver: NSObjectProtocol?
     private var reconcileTask: Task<Void, Never>?
     private var terminationTasks: [pid_t: Task<Void, Never>] = [:]
-    private var lastNotificationDateByBundleIdentifier: [String: Date] = [:]
     private var blockedBundleIdentifiers: Set<String> = []
     private var currentStatus: BlockerStatus = .inactive
-
-    init(notificationManager: NotificationManager) {
-        self.notificationManager = notificationManager
-    }
 
     deinit {
         if let launchObserver {
@@ -42,7 +34,6 @@ final class SystemAppBlocker: AppBlocker {
 
     func disable() {
         blockedBundleIdentifiers = []
-        lastNotificationDateByBundleIdentifier.removeAll()
         currentStatus = .inactive
         stopObservers()
     }
@@ -140,25 +131,5 @@ final class SystemAppBlocker: AppBlocker {
             _ = app.forceTerminate()
             try? await Task.sleep(for: .milliseconds(600))
         }
-
-        guard app.isTerminated else { return }
-        sendBlockedNotificationIfNeeded(
-            bundleIdentifier: bundleIdentifier,
-            appName: app.localizedName ?? bundleIdentifier
-        )
-    }
-
-    private func sendBlockedNotificationIfNeeded(bundleIdentifier: String, appName: String) {
-        let now = Date()
-        if let lastNotificationDate = lastNotificationDateByBundleIdentifier[bundleIdentifier],
-           now.timeIntervalSince(lastNotificationDate) < Self.notificationCooldown {
-            return
-        }
-
-        lastNotificationDateByBundleIdentifier[bundleIdentifier] = now
-        notificationManager.send(
-            title: "FocusNow",
-            body: "\(appName) was blocked during focus time."
-        )
     }
 }

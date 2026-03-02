@@ -37,7 +37,7 @@ final class AppCoordinator: ObservableObject {
         self.statsManager = StatsManager(modelContext: modelContext)
 
         let websiteBlocker = SystemWebsiteBlockerAdapter()
-        let appBlocker = SystemAppBlocker(notificationManager: notificationManager)
+        let appBlocker = SystemAppBlocker()
         self.blockingCoordinator = BlockingCoordinator(websiteBlocker: websiteBlocker, appBlocker: appBlocker)
 
         notificationManager.prepareAuthorizationIfNeeded()
